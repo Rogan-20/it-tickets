@@ -129,7 +129,13 @@ if (IS_PG) {
   console.log('[DB] Using PostgreSQL');
 } else {
   // ── SQLite mode (local development) ──
-  const Database = require('better-sqlite3');
+  let Database;
+  try {
+    Database = require('better-sqlite3');
+  } catch (e) {
+    console.error('[DB] better-sqlite3 not available. Set DATABASE_URL for PostgreSQL.');
+    process.exit(1);
+  }
   const dbPath = path.join(__dirname, '..', 'data', 'tickets.db');
   const dataDir = path.dirname(dbPath);
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
@@ -179,8 +185,10 @@ if (IS_PG) {
 // ── Schema creation ──
 async function initializeDatabase() {
   if (IS_PG) {
-    // PostgreSQL schema
-    await db.run(`
+    // PostgreSQL schema — use pool.query directly (not db.run which adds RETURNING id)
+    const pool = db._pool;
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS companies (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
@@ -191,7 +199,7 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS techs (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
@@ -202,7 +210,7 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS tickets (
         id SERIAL PRIMARY KEY,
         ref_number TEXT NOT NULL UNIQUE,
@@ -224,7 +232,7 @@ async function initializeDatabase() {
         updated_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS ticket_updates (
         id SERIAL PRIMARY KEY,
         ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
@@ -234,7 +242,7 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS ticket_photos (
         id SERIAL PRIMARY KEY,
         ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
@@ -244,7 +252,7 @@ async function initializeDatabase() {
         uploaded_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS push_subscriptions (
         id SERIAL PRIMARY KEY,
         endpoint TEXT NOT NULL UNIQUE,
@@ -254,7 +262,7 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS email_pending (
         id SERIAL PRIMARY KEY,
         message_id TEXT,
@@ -267,14 +275,14 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT,
         updated_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_messages (
         id SERIAL PRIMARY KEY,
         sender_name TEXT,
@@ -286,7 +294,7 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT NOW()
       )`);
 
-    await db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username TEXT NOT NULL UNIQUE,
@@ -299,11 +307,11 @@ async function initializeDatabase() {
       )`);
 
     // Indexes
-    await db.run('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)');
-    await db.run('CREATE INDEX IF NOT EXISTS idx_tickets_company ON tickets(company_id)');
-    await db.run('CREATE INDEX IF NOT EXISTS idx_tickets_tech ON tickets(assigned_tech_id)');
-    await db.run('CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)');
-    await db.run('CREATE INDEX IF NOT EXISTS idx_ticket_updates_ticket ON ticket_updates(ticket_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_company ON tickets(company_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_tech ON tickets(assigned_tech_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_ticket_updates_ticket ON ticket_updates(ticket_id)');
   } else {
     // SQLite schema (unchanged from original)
     db._sqlite.exec(`
