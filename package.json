@@ -10,12 +10,9 @@
     "preview": "vite preview",
     "start": "node --no-warnings server/server.js"
   },
-  "devDependencies": {
-    "vite": "^7.3.1"
-  },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.4",
-    "better-sqlite3": "^12.6.2",
+    "vite": "^7.3.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "imap": "^0.8.19",
@@ -30,5 +27,8 @@
     "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^3.0.2",
     "pg": "^8.13.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.6.2"
   }
 }
