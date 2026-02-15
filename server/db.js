@@ -424,7 +424,7 @@ async function initializeDatabase() {
   // Create default admin if needed
   const bcrypt = require('bcryptjs');
   const userCount = await db.get('SELECT COUNT(*) as c FROM users');
-  if (!userCount || userCount.c === 0) {
+  if (!userCount || Number(userCount.c) === 0) {
     const hash = bcrypt.hashSync('admin123', 10);
     await db.run('INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, ?, ?)',
       ['admin', 'Administrator', hash, 'admin']);
