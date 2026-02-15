@@ -1,0 +1,34 @@
+{
+  "name": "it-tickets",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "node --no-warnings server/server.js",
+    "dev:all": "start /B node --no-warnings server/server.js && vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node --no-warnings server/server.js"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.4",
+    "better-sqlite3": "^12.6.2",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "imap": "^0.8.19",
+    "mailparser": "^3.9.3",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.0",
+    "uuid": "^13.0.0",
+    "web-push": "^3.6.7",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^3.0.2",
+    "pg": "^8.13.0"
+  }
+}

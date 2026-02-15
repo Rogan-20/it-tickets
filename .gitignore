@@ -1,0 +1,9 @@
+node_modules/
+data/
+uploads/
+dist/
+*.db
+*.db-journal
+*.db-wal
+.env
+vapid-keys.json
