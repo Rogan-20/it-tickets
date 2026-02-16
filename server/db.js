@@ -316,13 +316,15 @@ async function initializeDatabase() {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_tech ON tickets(assigned_tech_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_ticket_updates_ticket ON ticket_updates(ticket_id)');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_archived ON tickets(archived)');
 
     // Migrations for existing databases
     try { await pool.query('ALTER TABLE tickets ADD COLUMN started_at TIMESTAMP'); } catch (e) { /* column exists */ }
     try { await pool.query('ALTER TABLE tickets ADD COLUMN closed_at TIMESTAMP'); } catch (e) { /* column exists */ }
     try { await pool.query('ALTER TABLE tickets ADD COLUMN archived INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
     try { await pool.query('ALTER TABLE users ADD COLUMN tech_id INTEGER REFERENCES techs(id) ON DELETE SET NULL'); } catch (e) { /* column exists */ }
+
+    // Index on new column (after migration ensures it exists)
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_archived ON tickets(archived)');
   } else {
     // SQLite schema (unchanged from original)
     db._sqlite.exec(`
