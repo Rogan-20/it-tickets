@@ -5,7 +5,7 @@ const JWT_EXPIRES = '24h';
 
 function generateToken(user) {
     return jwt.sign(
-        { id: user.id, username: user.username, display_name: user.display_name, role: user.role },
+        { id: user.id, username: user.username, display_name: user.display_name, role: user.role, tech_id: user.tech_id || null },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES }
     );

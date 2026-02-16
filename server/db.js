@@ -228,6 +228,9 @@ async function initializeDatabase() {
         recurring_parent_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
         recurring_schedule TEXT,
         due_date TIMESTAMP,
+        started_at TIMESTAMP,
+        closed_at TIMESTAMP,
+        archived INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )`);
@@ -301,6 +304,7 @@ async function initializeDatabase() {
         display_name TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'receptionist',
+        tech_id INTEGER REFERENCES techs(id) ON DELETE SET NULL,
         active INTEGER NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
@@ -312,6 +316,13 @@ async function initializeDatabase() {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_tech ON tickets(assigned_tech_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_ticket_updates_ticket ON ticket_updates(ticket_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_tickets_archived ON tickets(archived)');
+
+    // Migrations for existing databases
+    try { await pool.query('ALTER TABLE tickets ADD COLUMN started_at TIMESTAMP'); } catch (e) { /* column exists */ }
+    try { await pool.query('ALTER TABLE tickets ADD COLUMN closed_at TIMESTAMP'); } catch (e) { /* column exists */ }
+    try { await pool.query('ALTER TABLE tickets ADD COLUMN archived INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+    try { await pool.query('ALTER TABLE users ADD COLUMN tech_id INTEGER REFERENCES techs(id) ON DELETE SET NULL'); } catch (e) { /* column exists */ }
   } else {
     // SQLite schema (unchanged from original)
     db._sqlite.exec(`
@@ -350,6 +361,9 @@ async function initializeDatabase() {
         recurring_parent_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
         recurring_schedule TEXT,
         due_date DATETIME,
+        started_at DATETIME,
+        closed_at DATETIME,
+        archived INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -409,6 +423,7 @@ async function initializeDatabase() {
         display_name TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'receptionist',
+        tech_id INTEGER REFERENCES techs(id) ON DELETE SET NULL,
         active INTEGER NOT NULL DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -418,7 +433,14 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_tickets_tech ON tickets(assigned_tech_id);
       CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority);
       CREATE INDEX IF NOT EXISTS idx_ticket_updates_ticket ON ticket_updates(ticket_id);
+      CREATE INDEX IF NOT EXISTS idx_tickets_archived ON tickets(archived);
     `);
+
+    // Migrations for existing databases
+    try { db._sqlite.exec('ALTER TABLE tickets ADD COLUMN started_at DATETIME'); } catch (e) { /* column exists */ }
+    try { db._sqlite.exec('ALTER TABLE tickets ADD COLUMN closed_at DATETIME'); } catch (e) { /* column exists */ }
+    try { db._sqlite.exec('ALTER TABLE tickets ADD COLUMN archived INTEGER DEFAULT 0'); } catch (e) { /* column exists */ }
+    try { db._sqlite.exec('ALTER TABLE users ADD COLUMN tech_id INTEGER REFERENCES techs(id) ON DELETE SET NULL'); } catch (e) { /* column exists */ }
   }
 
   // Create default admin if needed

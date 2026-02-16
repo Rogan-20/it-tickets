@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function TicketCreate({ addToast, authFetch }) {
+export default function TicketCreate({ addToast, authFetch, currentUser }) {
     const [companies, setCompanies] = useState([]);
     const [techs, setTechs] = useState([]);
     const [photos, setPhotos] = useState([]);
@@ -126,21 +126,35 @@ export default function TicketCreate({ addToast, authFetch }) {
                         <div className="form-row">
                             <div className="form-group" style={{ position: 'relative' }}>
                                 <label className="form-label">Company</label>
-                                <input className="form-input" placeholder="Search or type new company..."
-                                    value={companySearch}
-                                    onChange={e => { setCompanySearch(e.target.value); setShowCompanyDropdown(true); updateForm('company_id', ''); updateForm('company_name', e.target.value); }}
-                                    onFocus={() => setShowCompanyDropdown(true)}
-                                    onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 200)} />
-                                {showCompanyDropdown && filteredCompanies.length > 0 && (
-                                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', maxHeight: 180, overflowY: 'auto', zIndex: 10 }}>
-                                        {filteredCompanies.map(c => (
-                                            <div key={c.id} style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)' }}
-                                                onMouseDown={() => { updateForm('company_id', c.id); updateForm('company_name', ''); setCompanySearch(c.name); setShowCompanyDropdown(false); }}>
-                                                {c.name}
-                                                <span style={{ float: 'right', color: 'var(--text-muted)', fontSize: 11 }}>{c.open_tickets || 0} open</span>
+                                {currentUser?.role === 'admin' ? (
+                                    /* Admin: search + create new company */
+                                    <>
+                                        <input className="form-input" placeholder="Search or type new company..."
+                                            value={companySearch}
+                                            onChange={e => { setCompanySearch(e.target.value); setShowCompanyDropdown(true); updateForm('company_id', ''); updateForm('company_name', e.target.value); }}
+                                            onFocus={() => setShowCompanyDropdown(true)}
+                                            onBlur={() => setTimeout(() => setShowCompanyDropdown(false), 200)} />
+                                        {showCompanyDropdown && filteredCompanies.length > 0 && (
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', maxHeight: 180, overflowY: 'auto', zIndex: 10 }}>
+                                                {filteredCompanies.map(c => (
+                                                    <div key={c.id} style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-light)' }}
+                                                        onMouseDown={() => { updateForm('company_id', c.id); updateForm('company_name', ''); setCompanySearch(c.name); setShowCompanyDropdown(false); }}>
+                                                        {c.name}
+                                                        <span style={{ float: 'right', color: 'var(--text-muted)', fontSize: 11 }}>{c.open_tickets || 0} open</span>
+                                                    </div>
+                                                ))}
                                             </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    /* Non-admin: dropdown only */
+                                    <select className="form-select" value={form.company_id}
+                                        onChange={e => { updateForm('company_id', e.target.value); updateForm('company_name', ''); }}>
+                                        <option value="">Select a company</option>
+                                        {companies.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
                                         ))}
-                                    </div>
+                                    </select>
                                 )}
                             </div>
                             <div className="form-group">

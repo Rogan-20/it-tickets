@@ -12,7 +12,9 @@ export default function TicketDetail({ addToast, authFetch, currentUser }) {
     const [companies, setCompanies] = useState([]);
     const [uploading, setUploading] = useState(false);
     const [lightboxPhoto, setLightboxPhoto] = useState(null);
+    const [elapsed, setElapsed] = useState('');
     const photoRef = useRef();
+    const timerRef = useRef(null);
 
     const fetchTicket = () => {
         authFetch(`/api/tickets/${id}`)
@@ -26,6 +28,35 @@ export default function TicketDetail({ addToast, authFetch, currentUser }) {
         authFetch('/api/techs?status=active').then(r => r.json()).then(setTechs).catch(() => { });
         authFetch('/api/companies').then(r => r.json()).then(setCompanies).catch(() => { });
     }, [id]);
+
+    // Live timer effect
+    useEffect(() => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (ticket && ticket.started_at && !ticket.closed_at && !['closed', 'resolved'].includes(ticket.status)) {
+            const updateTimer = () => {
+                const start = new Date(ticket.started_at);
+                const now = new Date();
+                const diff = Math.max(0, Math.floor((now - start) / 1000));
+                const h = Math.floor(diff / 3600);
+                const m = Math.floor((diff % 3600) / 60);
+                const s = diff % 60;
+                setElapsed(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+            };
+            updateTimer();
+            timerRef.current = setInterval(updateTimer, 1000);
+        } else if (ticket && ticket.started_at && ticket.closed_at) {
+            const start = new Date(ticket.started_at);
+            const end = new Date(ticket.closed_at);
+            const diff = Math.max(0, Math.floor((end - start) / 1000));
+            const h = Math.floor(diff / 3600);
+            const m = Math.floor((diff % 3600) / 60);
+            const s = diff % 60;
+            setElapsed(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+        } else {
+            setElapsed('');
+        }
+        return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    }, [ticket?.started_at, ticket?.closed_at, ticket?.status]);
 
     const updateTicket = async (fields) => {
         try {
@@ -49,7 +80,7 @@ export default function TicketDetail({ addToast, authFetch, currentUser }) {
             await authFetch(`/api/tickets/${id}/updates`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ update_text: updateText, updated_by: 'Tech' })
+                body: JSON.stringify({ update_text: updateText, updated_by: currentUser?.display_name || 'Tech' })
             });
             setUpdateText('');
             fetchTicket();
@@ -82,8 +113,43 @@ export default function TicketDetail({ addToast, authFetch, currentUser }) {
         navigate('/tickets');
     };
 
+    const archiveTicket = async () => {
+        try {
+            await authFetch(`/api/tickets/${id}/archive`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updated_by: currentUser?.display_name || 'System' })
+            });
+            addToast('Ticket archived', 'success');
+            fetchTicket();
+        } catch {
+            addToast('Failed to archive', 'error');
+        }
+    };
+
+    const unarchiveTicket = async () => {
+        try {
+            await authFetch(`/api/tickets/${id}/unarchive`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updated_by: currentUser?.display_name || 'System' })
+            });
+            addToast('Ticket unarchived', 'success');
+            fetchTicket();
+        } catch {
+            addToast('Failed to unarchive', 'error');
+        }
+    };
+
+    const reopenTicket = async () => {
+        await updateTicket({ status: 'open', updated_by: currentUser?.display_name || 'System' });
+    };
+
     if (loading) return <div className="page-body"><div className="loading"><div className="spinner" /></div></div>;
     if (!ticket) return <div className="page-body"><div className="empty-state"><div className="empty-state-icon">❌</div><div className="empty-state-text">Ticket not found</div></div></div>;
+
+    const isClosed = ticket.status === 'closed';
+    const isArchived = ticket.archived === 1;
 
     return (
         <>
@@ -93,12 +159,22 @@ export default function TicketDetail({ addToast, authFetch, currentUser }) {
                         <span className="ticket-ref" style={{ fontSize: 18 }}>{ticket.ref_number}</span>
                         <span style={{ margin: '0 8px', color: 'var(--text-muted)' }}>—</span>
                         {ticket.title}
+                        {isArchived && <span className="badge" style={{ marginLeft: 10, background: 'var(--surface-2)', color: 'var(--text-muted)' }}>📦 Archived</span>}
                     </h1>
                     <p className="page-subtitle">
                         Created {new Date(ticket.created_at).toLocaleString()} · Source: {ticket.source?.replace('_', ' ')}
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {isClosed && !isArchived && (
+                        <>
+                            <button className="btn btn-primary btn-sm" onClick={reopenTicket}>🔓 Re-open</button>
+                            <button className="btn btn-secondary btn-sm" onClick={archiveTicket}>📦 Archive</button>
+                        </>
+                    )}
+                    {isArchived && (
+                        <button className="btn btn-secondary btn-sm" onClick={unarchiveTicket}>📂 Unarchive</button>
+                    )}
                     <button className="btn btn-danger btn-sm" onClick={deleteTicket}>🗑️ Delete</button>
                 </div>
             </div>
@@ -182,6 +258,29 @@ export default function TicketDetail({ addToast, authFetch, currentUser }) {
 
                     {/* Right column - Sidebar info */}
                     <div>
+                        {/* Timer */}
+                        {ticket.started_at && (
+                            <div className="detail-section">
+                                <div className="detail-section-title">⏱️ Timer</div>
+                                <div className="card" style={{ textAlign: 'center' }}>
+                                    <div style={{
+                                        fontSize: 28, fontWeight: 700, fontFamily: 'monospace',
+                                        color: ticket.closed_at ? 'var(--text-muted)' : 'var(--success)',
+                                        letterSpacing: 2
+                                    }}>
+                                        {elapsed || '00:00:00'}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
+                                        {ticket.closed_at ? '✅ Completed' : '🔄 Running'}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                                        Started: {new Date(ticket.started_at).toLocaleString()}
+                                        {ticket.closed_at && <><br />Closed: {new Date(ticket.closed_at).toLocaleString()}</>}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Status */}
                         <div className="detail-section">
                             <div className="detail-section-title">📊 Status</div>

@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import TicketList from './pages/TicketList';
 import TicketCreate from './pages/TicketCreate';
 import TicketDetail from './pages/TicketDetail';
+import MyTickets from './pages/MyTickets';
 import Companies from './pages/Companies';
 import Techs from './pages/Techs';
 import EmailInbox from './pages/EmailInbox';
@@ -146,6 +147,11 @@ function AppContent() {
                     <NavLink to="/tickets/new" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
                         <span className="nav-icon">➕</span> New Ticket
                     </NavLink>
+                    {currentUser.tech_id && (
+                        <NavLink to="/my-tickets" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+                            <span className="nav-icon">👤</span> My Tickets
+                        </NavLink>
+                    )}
 
                     <div className="nav-section-label">Inbox</div>
                     <NavLink to="/email-inbox" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
@@ -210,11 +216,12 @@ function AppContent() {
 
             <main className="main-content">
                 <Routes>
-                    <Route path="/" element={<Dashboard addToast={addToast} authFetch={authFetch} />} />
+                    <Route path="/" element={<Dashboard addToast={addToast} authFetch={authFetch} currentUser={currentUser} />} />
                     <Route path="/tickets" element={<TicketList addToast={addToast} authFetch={authFetch} />} />
-                    <Route path="/tickets/new" element={<TicketCreate addToast={addToast} authFetch={authFetch} />} />
+                    <Route path="/tickets/new" element={<TicketCreate addToast={addToast} authFetch={authFetch} currentUser={currentUser} />} />
                     <Route path="/tickets/:id" element={<TicketDetail addToast={addToast} authFetch={authFetch} currentUser={currentUser} />} />
-                    <Route path="/companies" element={<Companies addToast={addToast} authFetch={authFetch} />} />
+                    <Route path="/my-tickets" element={<MyTickets addToast={addToast} authFetch={authFetch} currentUser={currentUser} />} />
+                    <Route path="/companies" element={<Companies addToast={addToast} authFetch={authFetch} currentUser={currentUser} />} />
                     <Route path="/techs" element={<Techs addToast={addToast} authFetch={authFetch} />} />
                     <Route path="/email-inbox" element={<EmailInbox addToast={addToast} authFetch={authFetch} />} />
                     <Route path="/whatsapp-inbox" element={<WhatsAppInbox addToast={addToast} authFetch={authFetch} />} />

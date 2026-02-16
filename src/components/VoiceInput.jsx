@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 export default function VoiceInput({ onResult }) {
     const [recording, setRecording] = useState(false);
@@ -6,22 +6,13 @@ export default function VoiceInput({ onResult }) {
     const [error, setError] = useState('');
     const recognitionRef = useRef(null);
     const finalTranscriptRef = useRef('');
+    const processedIndexRef = useRef(0);
 
-    const toggleRecording = async () => {
+    const toggleRecording = useCallback(async () => {
         setError('');
 
         if (recording) {
             recognitionRef.current?.stop();
-            setRecording(false);
-            return;
-        }
-
-        // Check for microphone permission first
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(t => t.stop()); // release immediately
-        } catch (e) {
-            setError('Microphone access denied. Please allow microphone in browser settings.');
             return;
         }
 
@@ -31,18 +22,33 @@ export default function VoiceInput({ onResult }) {
             return;
         }
 
+        // Check microphone permission — but keep the stream alive until recognition starts
+        let micStream = null;
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+            setError('Microphone access denied. Please allow microphone in browser settings.');
+            return;
+        }
+
         const recognition = new SpeechRecognition();
-        recognition.continuous = true;
+        recognition.continuous = false;      // single utterance — prevents duplicates on mobile
         recognition.interimResults = true;
         recognition.lang = 'en-US';
+        recognition.maxAlternatives = 1;
         finalTranscriptRef.current = '';
+        processedIndexRef.current = 0;
 
         recognition.onresult = (event) => {
             let interim = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const result = event.results[i];
                 if (result.isFinal) {
-                    finalTranscriptRef.current += result[0].transcript + ' ';
+                    // Only process each result index once to prevent duplicates
+                    if (i >= processedIndexRef.current) {
+                        finalTranscriptRef.current += result[0].transcript + ' ';
+                        processedIndexRef.current = i + 1;
+                    }
                 } else {
                     interim += result[0].transcript;
                 }
@@ -51,26 +57,38 @@ export default function VoiceInput({ onResult }) {
         };
 
         recognition.onend = () => {
+            // Release mic stream now that recognition has ended
+            if (micStream) {
+                micStream.getTracks().forEach(t => t.stop());
+                micStream = null;
+            }
             setRecording(false);
             const text = finalTranscriptRef.current.trim();
             if (text) {
                 onResult(text);
                 setTranscript('');
-            } else if (!error) {
-                setError('No speech detected. Try again.');
-                setTimeout(() => setError(''), 3000);
+            } else {
+                setError('No speech detected. Try speaking louder or closer to the mic.');
+                setTimeout(() => setError(''), 4000);
             }
         };
 
         recognition.onerror = (e) => {
             console.error('Speech recognition error:', e.error);
+            if (micStream) {
+                micStream.getTracks().forEach(t => t.stop());
+                micStream = null;
+            }
             setRecording(false);
             if (e.error === 'not-allowed') {
                 setError('Microphone access denied.');
             } else if (e.error === 'no-speech') {
                 setError('No speech detected. Try again.');
             } else if (e.error === 'network') {
-                setError('Network error. Check your connection.');
+                setError('Network error. Speech recognition requires internet.');
+            } else if (e.error === 'aborted') {
+                // User stopped — not an error
+                return;
             } else {
                 setError(`Error: ${e.error}`);
             }
@@ -82,9 +100,12 @@ export default function VoiceInput({ onResult }) {
             recognition.start();
             setRecording(true);
         } catch (e) {
-            setError('Could not start voice input.');
+            if (micStream) {
+                micStream.getTracks().forEach(t => t.stop());
+            }
+            setError('Could not start voice input. Try refreshing.');
         }
-    };
+    }, [recording, onResult]);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>

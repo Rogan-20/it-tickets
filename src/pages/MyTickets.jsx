@@ -1,26 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
-export default function TicketList({ addToast, authFetch }) {
+export default function MyTickets({ addToast, authFetch, currentUser }) {
     const [data, setData] = useState({ tickets: [], stats: {}, total: 0 });
     const [loading, setLoading] = useState(true);
-    const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
 
-    const [search, setSearch] = useState(searchParams.get('search') || '');
-    const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-    const [priorityFilter, setPriorityFilter] = useState(searchParams.get('priority') || '');
-    const [sourceFilter, setSourceFilter] = useState('');
-    const [showArchived, setShowArchived] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState('');
 
     const fetchTickets = () => {
+        if (!currentUser?.tech_id) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         const params = new URLSearchParams();
-        if (search) params.set('search', search);
+        params.set('tech_id', currentUser.tech_id);
         if (statusFilter) params.set('status', statusFilter);
         if (priorityFilter) params.set('priority', priorityFilter);
-        if (sourceFilter) params.set('source', sourceFilter);
-        if (showArchived) params.set('archived', 'true');
 
         authFetch(`/api/tickets?${params}`)
             .then(r => r.json())
@@ -28,12 +26,27 @@ export default function TicketList({ addToast, authFetch }) {
             .catch(() => setLoading(false));
     };
 
-    useEffect(() => { fetchTickets(); }, [statusFilter, priorityFilter, sourceFilter, showArchived]);
+    useEffect(() => { fetchTickets(); }, [statusFilter, priorityFilter]);
 
-    const handleSearch = (e) => {
-        e.preventDefault();
-        fetchTickets();
-    };
+    if (!currentUser?.tech_id) {
+        return (
+            <>
+                <div className="page-header">
+                    <div>
+                        <h1 className="page-title">My Tickets</h1>
+                        <p className="page-subtitle">Tickets assigned to you</p>
+                    </div>
+                </div>
+                <div className="page-body">
+                    <div className="empty-state">
+                        <div className="empty-state-icon">🔗</div>
+                        <div className="empty-state-text">No tech profile linked</div>
+                        <div className="empty-state-sub">Ask your admin to link your account to a tech profile</div>
+                    </div>
+                </div>
+            </>
+        );
+    }
 
     const formatElapsed = (startedAt, closedAt) => {
         if (!startedAt) return null;
@@ -50,22 +63,13 @@ export default function TicketList({ addToast, authFetch }) {
         <>
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">{showArchived ? 'Archived Tickets' : 'All Tickets'}</h1>
-                    <p className="page-subtitle">{data.total} ticket{data.total !== 1 ? 's' : ''} found</p>
+                    <h1 className="page-title">My Tickets</h1>
+                    <p className="page-subtitle">{data.total} ticket{data.total !== 1 ? 's' : ''} assigned to you</p>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                        className={`btn ${showArchived ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                        onClick={() => setShowArchived(!showArchived)}
-                    >
-                        📦 {showArchived ? 'Show Active' : 'Show Archived'}
-                    </button>
-                    <button className="btn btn-primary" onClick={() => navigate('/tickets/new')}>➕ New Ticket</button>
-                </div>
+                <button className="btn btn-primary" onClick={() => navigate('/tickets/new')}>➕ New Ticket</button>
             </div>
             <div className="page-body">
-                <form className="filters-bar" onSubmit={handleSearch}>
-                    <input className="filter-input" placeholder="🔍 Search tickets..." value={search} onChange={e => setSearch(e.target.value)} />
+                <div className="filters-bar">
                     <select className="filter-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                         <option value="">All Status</option>
                         <option value="new">New</option>
@@ -82,24 +86,15 @@ export default function TicketList({ addToast, authFetch }) {
                         <option value="high">High</option>
                         <option value="critical">Critical</option>
                     </select>
-                    <select className="filter-select" value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}>
-                        <option value="">All Sources</option>
-                        <option value="email">Email</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="phone">Phone</option>
-                        <option value="walk_in">Walk-in</option>
-                        <option value="recurring">Recurring</option>
-                    </select>
-                    <button type="submit" className="btn btn-secondary btn-sm">Search</button>
-                </form>
+                </div>
 
                 {loading ? (
                     <div className="loading"><div className="spinner" /></div>
                 ) : data.tickets.length === 0 ? (
                     <div className="empty-state">
-                        <div className="empty-state-icon">🔍</div>
-                        <div className="empty-state-text">No tickets found</div>
-                        <div className="empty-state-sub">Try adjusting your filters or create a new ticket</div>
+                        <div className="empty-state-icon">✅</div>
+                        <div className="empty-state-text">No tickets assigned</div>
+                        <div className="empty-state-sub">You're all caught up!</div>
                     </div>
                 ) : (
                     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -111,10 +106,7 @@ export default function TicketList({ addToast, authFetch }) {
                                     <th>Company</th>
                                     <th>Priority</th>
                                     <th>Status</th>
-                                    <th>Tech</th>
                                     <th>Timer</th>
-                                    <th>Source</th>
-                                    <th>Updates</th>
                                     <th>Created</th>
                                 </tr>
                             </thead>
@@ -122,22 +114,10 @@ export default function TicketList({ addToast, authFetch }) {
                                 {data.tickets.map(t => (
                                     <tr key={t.id} onClick={() => navigate(`/tickets/${t.id}`)}>
                                         <td><span className="ticket-ref">{t.ref_number}</span></td>
-                                        <td className="ticket-title-cell">
-                                            {t.title}
-                                            {t.photo_count > 0 && <span style={{ marginLeft: 6, opacity: 0.5 }}>📷{t.photo_count}</span>}
-                                            {t.archived === 1 && <span className="badge" style={{ marginLeft: 6, background: 'var(--surface-2)', color: 'var(--text-muted)', fontSize: 10 }}>📦</span>}
-                                        </td>
+                                        <td className="ticket-title-cell">{t.title}</td>
                                         <td>{t.company_name || '—'}</td>
                                         <td><span className={`badge badge-${t.priority}`}>{t.priority}</span></td>
                                         <td><span className={`badge badge-${t.status}`}>{t.status.replace('_', ' ')}</span></td>
-                                        <td>
-                                            {t.tech_name ? (
-                                                <>
-                                                    {t.tech_name}
-                                                    <span className={`badge badge-${t.tech_type}`} style={{ marginLeft: 6 }}>{t.tech_type}</span>
-                                                </>
-                                            ) : '—'}
-                                        </td>
                                         <td style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
                                             {t.started_at ? (
                                                 <span style={{ color: t.closed_at ? 'var(--text-muted)' : 'var(--success)' }}>
@@ -145,8 +125,6 @@ export default function TicketList({ addToast, authFetch }) {
                                                 </span>
                                             ) : '—'}
                                         </td>
-                                        <td><span className="badge" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>{t.source?.replace('_', ' ')}</span></td>
-                                        <td style={{ textAlign: 'center' }}>{t.update_count || 0}</td>
                                         <td style={{ whiteSpace: 'nowrap', fontSize: 12, color: 'var(--text-muted)' }}>
                                             {new Date(t.created_at).toLocaleDateString()}
                                         </td>

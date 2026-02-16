@@ -12,7 +12,10 @@ router.use(requireAuth, requireAdmin);
 router.get('/', async (req, res) => {
     try {
         const users = await db.all(
-            'SELECT id, username, display_name, role, active, created_at, updated_at FROM users ORDER BY role, display_name'
+            `SELECT u.id, u.username, u.display_name, u.role, u.tech_id, u.active, u.created_at, u.updated_at,
+             t.name as tech_name
+             FROM users u LEFT JOIN techs t ON u.tech_id = t.id
+             ORDER BY u.role, u.display_name`
         );
         res.json(users);
     } catch (err) {
@@ -23,7 +26,7 @@ router.get('/', async (req, res) => {
 // POST /api/users - create user
 router.post('/', async (req, res) => {
     try {
-        const { username, display_name, password, role } = req.body;
+        const { username, display_name, password, role, tech_id } = req.body;
         if (!username || !password || !display_name) {
             return res.status(400).json({ error: 'Username, display name, and password are required' });
         }
@@ -40,12 +43,12 @@ router.post('/', async (req, res) => {
         const validRole = ['admin', 'tech', 'receptionist'].includes(role) ? role : 'receptionist';
 
         const result = await db.run(
-            'INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, ?, ?)',
-            [username.toLowerCase().trim(), display_name.trim(), hash, validRole]
+            'INSERT INTO users (username, display_name, password_hash, role, tech_id) VALUES (?, ?, ?, ?, ?)',
+            [username.toLowerCase().trim(), display_name.trim(), hash, validRole, tech_id || null]
         );
 
         const user = await db.get(
-            'SELECT id, username, display_name, role, active, created_at FROM users WHERE id = ?',
+            'SELECT id, username, display_name, role, tech_id, active, created_at FROM users WHERE id = ?',
             [result.lastInsertRowid]
         );
 
@@ -61,7 +64,7 @@ router.put('/:id', async (req, res) => {
         const user = await db.get('SELECT * FROM users WHERE id = ?', [req.params.id]);
         if (!user) return res.status(404).json({ error: 'User not found' });
 
-        const { display_name, role, active, new_password } = req.body;
+        const { display_name, role, active, new_password, tech_id } = req.body;
 
         if (display_name) {
             await db.run('UPDATE users SET display_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
@@ -80,9 +83,13 @@ router.put('/:id', async (req, res) => {
             await db.run('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
                 [hash, req.params.id]);
         }
+        if (tech_id !== undefined) {
+            await db.run('UPDATE users SET tech_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [tech_id || null, req.params.id]);
+        }
 
         const updated = await db.get(
-            'SELECT id, username, display_name, role, active, created_at, updated_at FROM users WHERE id = ?',
+            'SELECT id, username, display_name, role, tech_id, active, created_at, updated_at FROM users WHERE id = ?',
             [req.params.id]
         );
         res.json(updated);

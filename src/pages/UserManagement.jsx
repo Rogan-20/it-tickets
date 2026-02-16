@@ -2,17 +2,21 @@ import { useState, useEffect } from 'react';
 
 export default function UserManagement({ addToast, authFetch }) {
     const [users, setUsers] = useState([]);
+    const [techs, setTechs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
     const [showEdit, setShowEdit] = useState(null);
-    const [createForm, setCreateForm] = useState({ username: '', display_name: '', password: '', role: 'receptionist' });
-    const [editForm, setEditForm] = useState({ display_name: '', role: '', new_password: '' });
+    const [createForm, setCreateForm] = useState({ username: '', display_name: '', password: '', role: 'receptionist', tech_id: '' });
+    const [editForm, setEditForm] = useState({ display_name: '', role: '', new_password: '', tech_id: '' });
 
     const fetchUsers = () => {
         authFetch('/api/users').then(r => r.json()).then(d => { setUsers(d); setLoading(false); }).catch(() => setLoading(false));
     };
 
-    useEffect(() => { fetchUsers(); }, []);
+    useEffect(() => {
+        fetchUsers();
+        authFetch('/api/techs').then(r => r.json()).then(setTechs).catch(() => { });
+    }, []);
 
     const createUser = async () => {
         if (!createForm.username || !createForm.display_name || !createForm.password) {
@@ -28,13 +32,13 @@ export default function UserManagement({ addToast, authFetch }) {
             if (!res.ok) { addToast(data.error || 'Failed', 'error'); return; }
             addToast(`User "${data.display_name}" created!`, 'success');
             setShowCreate(false);
-            setCreateForm({ username: '', display_name: '', password: '', role: 'receptionist' });
+            setCreateForm({ username: '', display_name: '', password: '', role: 'receptionist', tech_id: '' });
             fetchUsers();
         } catch { addToast('Network error', 'error'); }
     };
 
     const openEdit = (user) => {
-        setEditForm({ display_name: user.display_name, role: user.role, new_password: '' });
+        setEditForm({ display_name: user.display_name, role: user.role, new_password: '', tech_id: user.tech_id || '' });
         setShowEdit(user);
     };
 
@@ -44,6 +48,8 @@ export default function UserManagement({ addToast, authFetch }) {
             if (editForm.display_name !== showEdit.display_name) body.display_name = editForm.display_name;
             if (editForm.role !== showEdit.role) body.role = editForm.role;
             if (editForm.new_password) body.new_password = editForm.new_password;
+            const newTechId = editForm.tech_id === '' ? null : Number(editForm.tech_id);
+            if (newTechId !== (showEdit.tech_id || null)) body.tech_id = newTechId;
 
             const res = await authFetch(`/api/users/${showEdit.id}`, {
                 method: 'PUT',
@@ -97,6 +103,7 @@ export default function UserManagement({ addToast, authFetch }) {
                                 <th>Username</th>
                                 <th>Display Name</th>
                                 <th>Role</th>
+                                <th>Linked Tech</th>
                                 <th>Status</th>
                                 <th>Created</th>
                                 <th style={{ width: 140 }}>Actions</th>
@@ -117,6 +124,9 @@ export default function UserManagement({ addToast, authFetch }) {
                                         }}>
                                             {roleLabels[u.role]}
                                         </span>
+                                    </td>
+                                    <td style={{ fontSize: 13, color: u.tech_name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                                        {u.tech_name || '—'}
                                     </td>
                                     <td>
                                         <span className={`badge badge-${u.active ? 'open' : 'closed'}`}>
@@ -179,6 +189,17 @@ export default function UserManagement({ addToast, authFetch }) {
                                     </select>
                                 </div>
                             </div>
+                            <div className="form-group">
+                                <label className="form-label">Link to Tech</label>
+                                <select className="form-select" value={createForm.tech_id}
+                                    onChange={e => setCreateForm(f => ({ ...f, tech_id: e.target.value }))}>
+                                    <option value="">None</option>
+                                    {techs.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} ({t.type})</option>
+                                    ))}
+                                </select>
+                                <small style={{ color: 'var(--text-muted)', fontSize: 11 }}>Link this user to a tech profile for "My Tickets"</small>
+                            </div>
                         </div>
                         <div className="modal-footer">
                             <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
@@ -218,6 +239,16 @@ export default function UserManagement({ addToast, authFetch }) {
                                         onChange={e => setEditForm(f => ({ ...f, new_password: e.target.value }))}
                                         placeholder="Leave blank to keep current" autoComplete="new-password" />
                                 </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Linked Tech</label>
+                                <select className="form-select" value={editForm.tech_id}
+                                    onChange={e => setEditForm(f => ({ ...f, tech_id: e.target.value }))}>
+                                    <option value="">None</option>
+                                    {techs.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} ({t.type})</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                         <div className="modal-footer">

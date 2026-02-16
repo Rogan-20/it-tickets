@@ -30,10 +30,17 @@ const upload = multer({
 // GET /api/tickets - list tickets with filters
 router.get('/', async (req, res) => {
     try {
-        const { status, priority, company_id, tech_id, search, source, category, limit = 100, offset = 0 } = req.query;
+        const { status, priority, company_id, tech_id, search, source, category, archived, limit = 100, offset = 0 } = req.query;
 
         let where = [];
         let params = {};
+
+        // By default, exclude archived tickets unless explicitly requested
+        if (archived === 'true') {
+            where.push('t.archived = 1');
+        } else {
+            where.push('(t.archived = 0 OR t.archived IS NULL)');
+        }
 
         if (status) { where.push('t.status = @status'); params.status = status; }
         if (priority) { where.push('t.priority = @priority'); params.priority = priority; }
@@ -218,6 +225,19 @@ router.put('/:id', async (req, res) => {
             due_date: due_date !== undefined ? due_date : null
         });
 
+        // Timer logic: set started_at when ticket moves to open/in_progress
+        if (status && ['open', 'in_progress'].includes(status) && !ticket.started_at) {
+            await db.run('UPDATE tickets SET started_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
+        }
+        // Set closed_at when ticket is closed
+        if (status === 'closed' && ticket.status !== 'closed') {
+            await db.run('UPDATE tickets SET closed_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
+        }
+        // Clear closed_at when re-opening a closed ticket
+        if (status && status !== 'closed' && ticket.status === 'closed') {
+            await db.run('UPDATE tickets SET closed_at = NULL WHERE id = ?', [req.params.id]);
+        }
+
         if (changes.length > 0) {
             const updateType = changes.some(c => c.includes('Status')) ? 'status_change' :
                 changes.some(c => c.includes('Assigned')) ? 'assignment' : 'note';
@@ -278,6 +298,34 @@ router.post('/:id/photos', upload.array('photos', 10), async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         await db.run('DELETE FROM tickets WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT /api/tickets/:id/archive - archive a closed ticket
+router.put('/:id/archive', async (req, res) => {
+    try {
+        const ticket = await db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id]);
+        if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+        await db.run('UPDATE tickets SET archived = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
+        await db.run("INSERT INTO ticket_updates (ticket_id, update_text, updated_by, update_type) VALUES (?, ?, ?, 'status_change')",
+            [req.params.id, 'Ticket archived', req.body.updated_by || 'System']);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT /api/tickets/:id/unarchive - unarchive a ticket
+router.put('/:id/unarchive', async (req, res) => {
+    try {
+        const ticket = await db.get('SELECT * FROM tickets WHERE id = ?', [req.params.id]);
+        if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+        await db.run('UPDATE tickets SET archived = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
+        await db.run("INSERT INTO ticket_updates (ticket_id, update_text, updated_by, update_type) VALUES (?, ?, ?, 'status_change')",
+            [req.params.id, 'Ticket unarchived', req.body.updated_by || 'System']);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

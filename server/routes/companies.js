@@ -1,5 +1,6 @@
 const express = require('express');
 const { db } = require('../db');
+const { requireAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -29,8 +30,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST /api/companies
-router.post('/', async (req, res) => {
+// POST /api/companies (admin only)
+router.post('/', requireAdmin, async (req, res) => {
     try {
         const { name, contact_email, contact_phone, address, notes } = req.body;
         if (!name) return res.status(400).json({ error: 'Company name is required' });
@@ -50,8 +51,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// PUT /api/companies/:id
-router.put('/:id', async (req, res) => {
+// PUT /api/companies/:id (admin only)
+router.put('/:id', requireAdmin, async (req, res) => {
     try {
         const { name, contact_email, contact_phone, address, notes } = req.body;
         await db.run(`
@@ -71,8 +72,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// DELETE /api/companies/:id
-router.delete('/:id', async (req, res) => {
+// DELETE /api/companies/:id (admin only)
+router.delete('/:id', requireAdmin, async (req, res) => {
     try {
         await db.run('DELETE FROM companies WHERE id = ?', [req.params.id]);
         res.json({ success: true });

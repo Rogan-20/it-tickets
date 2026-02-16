@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 
-export default function Companies({ addToast, authFetch }) {
+export default function Companies({ addToast, authFetch, currentUser }) {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editId, setEditId] = useState(null);
     const [form, setForm] = useState({ name: '', contact_email: '', contact_phone: '', address: '', notes: '' });
+
+    const isAdmin = currentUser?.role === 'admin';
 
     const fetchCompanies = () => {
         authFetch('/api/companies').then(r => r.json()).then(d => { setCompanies(d); setLoading(false); }).catch(() => setLoading(false));
@@ -49,14 +51,16 @@ export default function Companies({ addToast, authFetch }) {
                     <h1 className="page-title">Companies</h1>
                     <p className="page-subtitle">{companies.length} companies registered</p>
                 </div>
-                <button className="btn btn-primary" onClick={openNew}>➕ Add Company</button>
+                {isAdmin && (
+                    <button className="btn btn-primary" onClick={openNew}>➕ Add Company</button>
+                )}
             </div>
             <div className="page-body">
                 {companies.length === 0 ? (
                     <div className="empty-state">
                         <div className="empty-state-icon">🏢</div>
                         <div className="empty-state-text">No companies yet</div>
-                        <div className="empty-state-sub">Add your first client company</div>
+                        <div className="empty-state-sub">{isAdmin ? 'Add your first client company' : 'No companies have been added by admin yet'}</div>
                     </div>
                 ) : (
                     <div className="manage-list">
@@ -69,10 +73,12 @@ export default function Companies({ addToast, authFetch }) {
                                         {c.contact_phone && <div className="manage-card-detail">📞 {c.contact_phone}</div>}
                                         {c.address && <div className="manage-card-detail">📍 {c.address}</div>}
                                     </div>
-                                    <div className="manage-card-actions">
-                                        <button className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>✏️</button>
-                                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(c.id)}>🗑️</button>
-                                    </div>
+                                    {isAdmin && (
+                                        <div className="manage-card-actions">
+                                            <button className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>✏️</button>
+                                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(c.id)}>🗑️</button>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="manage-card-stats">
                                     <div className="manage-card-stat">Total: <strong>{c.ticket_count || 0}</strong></div>
@@ -84,7 +90,7 @@ export default function Companies({ addToast, authFetch }) {
                 )}
             </div>
 
-            {showModal && (
+            {showModal && isAdmin && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">

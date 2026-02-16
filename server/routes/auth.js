@@ -30,7 +30,8 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 username: user.username,
                 display_name: user.display_name,
-                role: user.role
+                role: user.role,
+                tech_id: user.tech_id || null
             }
         });
     } catch (err) {
@@ -41,7 +42,7 @@ router.post('/login', async (req, res) => {
 // GET /api/auth/me - get current user from token
 router.get('/me', requireAuth, async (req, res) => {
     try {
-        const user = await db.get('SELECT id, username, display_name, role, active FROM users WHERE id = ?', [req.user.id]);
+        const user = await db.get('SELECT id, username, display_name, role, tech_id, active FROM users WHERE id = ?', [req.user.id]);
         if (!user || !user.active) {
             return res.status(401).json({ error: 'User not found or inactive' });
         }

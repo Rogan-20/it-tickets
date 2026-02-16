@@ -1,19 +1,48 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Dashboard({ addToast, authFetch }) {
+export default function Dashboard({ addToast, authFetch, currentUser }) {
     const [data, setData] = useState({ tickets: [], stats: {} });
     const [loading, setLoading] = useState(true);
+    const [companies, setCompanies] = useState([]);
+    const [techs, setTechs] = useState([]);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        authFetch('/api/tickets?limit=10')
+    // Filters
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState('');
+    const [companyFilter, setCompanyFilter] = useState('');
+    const [techFilter, setTechFilter] = useState('');
+
+    const fetchData = () => {
+        setLoading(true);
+        const params = new URLSearchParams();
+        params.set('limit', '20');
+        if (search) params.set('search', search);
+        if (statusFilter) params.set('status', statusFilter);
+        if (priorityFilter) params.set('priority', priorityFilter);
+        if (companyFilter) params.set('company_id', companyFilter);
+        if (techFilter) params.set('tech_id', techFilter);
+
+        authFetch(`/api/tickets?${params}`)
             .then(r => r.json())
             .then(d => { setData(d); setLoading(false); })
             .catch(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchData();
+        authFetch('/api/companies').then(r => r.json()).then(setCompanies).catch(() => { });
+        authFetch('/api/techs?status=active').then(r => r.json()).then(setTechs).catch(() => { });
     }, []);
 
-    const { stats } = data;
+    useEffect(() => { fetchData(); }, [statusFilter, priorityFilter, companyFilter, techFilter]);
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        fetchData();
+    };
 
     const enableNotifications = async () => {
         try {
@@ -38,7 +67,7 @@ export default function Dashboard({ addToast, authFetch }) {
         }
     };
 
-    if (loading) return <div className="page-body"><div className="loading"><div className="spinner" /></div></div>;
+    const { stats } = data;
 
     return (
         <>
@@ -103,11 +132,49 @@ export default function Dashboard({ addToast, authFetch }) {
                         <h2 className="card-title">Recent Tickets</h2>
                         <button className="btn btn-secondary btn-sm" onClick={() => navigate('/tickets')}>View All →</button>
                     </div>
-                    {data.tickets.length === 0 ? (
+
+                    {/* Search & Filters */}
+                    <form className="filters-bar" onSubmit={handleSearch} style={{ marginBottom: 16 }}>
+                        <input className="filter-input" placeholder="🔍 Search tickets..." value={search}
+                            onChange={e => setSearch(e.target.value)} />
+                        <select className="filter-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                            <option value="">All Status</option>
+                            <option value="new">New</option>
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="waiting">Waiting</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                        <select className="filter-select" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}>
+                            <option value="">All Priority</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                        <select className="filter-select" value={companyFilter} onChange={e => setCompanyFilter(e.target.value)}>
+                            <option value="">All Companies</option>
+                            {companies.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                        <select className="filter-select" value={techFilter} onChange={e => setTechFilter(e.target.value)}>
+                            <option value="">All Techs</option>
+                            {techs.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                        </select>
+                        <button type="submit" className="btn btn-secondary btn-sm">Search</button>
+                    </form>
+
+                    {loading ? (
+                        <div className="loading"><div className="spinner" /></div>
+                    ) : data.tickets.length === 0 ? (
                         <div className="empty-state">
                             <div className="empty-state-icon">🎫</div>
-                            <div className="empty-state-text">No tickets yet</div>
-                            <div className="empty-state-sub">Create your first ticket to get started</div>
+                            <div className="empty-state-text">No tickets found</div>
+                            <div className="empty-state-sub">Try adjusting your filters or create a new ticket</div>
                         </div>
                     ) : (
                         <table className="ticket-table">
