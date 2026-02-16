@@ -161,6 +161,7 @@ body {
   font-weight: 700;
   background: linear-gradient(135deg, var(--text-bright), var(--primary-light));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   white-space: nowrap;
 }
