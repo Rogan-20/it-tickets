@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, getNextRefNumber } = require('../db');
+const { db, getNextRefNumber, IS_PG } = require('../db');
 const multer = require('multer');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -49,7 +49,8 @@ router.get('/', async (req, res) => {
         if (source) { where.push('t.source = @source'); params.source = source; }
         if (category) { where.push('t.category = @category'); params.category = category; }
         if (search) {
-            where.push('(t.title LIKE @search OR t.description LIKE @search OR t.ref_number LIKE @search OR t.contact_name LIKE @search)');
+            const likeOp = IS_PG ? 'ILIKE' : 'LIKE';
+            where.push(`(t.title ${likeOp} @search OR t.description ${likeOp} @search OR t.ref_number ${likeOp} @search OR t.contact_name ${likeOp} @search)`);
             params.search = `%${search}%`;
         }
 
@@ -76,7 +77,7 @@ router.get('/', async (req, res) => {
             new_count: (await db.get("SELECT COUNT(*) as c FROM tickets WHERE status = 'new'")).c,
             open: (await db.get("SELECT COUNT(*) as c FROM tickets WHERE status IN ('open','in_progress')")).c,
             critical: (await db.get("SELECT COUNT(*) as c FROM tickets WHERE priority = 'critical' AND status NOT IN ('resolved','closed')")).c,
-            resolved_today: (await db.get("SELECT COUNT(*) as c FROM tickets WHERE status = 'resolved' AND DATE(updated_at) = CURRENT_DATE")).c || 0,
+            resolved_today: (await db.get("SELECT COUNT(*) as c FROM tickets WHERE status = 'resolved' AND updated_at >= CURRENT_DATE")).c || 0,
             waiting: (await db.get("SELECT COUNT(*) as c FROM tickets WHERE status = 'waiting'")).c,
         };
 

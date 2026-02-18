@@ -66,14 +66,14 @@ if (IS_PG) {
         finalSql = convertParams(sql);
       }
 
-      // For INSERT, add RETURNING id to get the new ID
+      // For INSERT, add RETURNING * to get the new row (not all tables have 'id')
       if (/^\s*INSERT/i.test(finalSql) && !/RETURNING/i.test(finalSql)) {
-        finalSql += ' RETURNING id';
+        finalSql += ' RETURNING *';
       }
 
       const result = await pool.query(finalSql, finalParams);
       return {
-        lastInsertRowid: result.rows?.[0]?.id,
+        lastInsertRowid: result.rows?.[0]?.id ?? result.rows?.[0]?.key ?? null,
         changes: result.rowCount
       };
     },
@@ -108,10 +108,10 @@ if (IS_PG) {
               finalSql = convertParams(sql);
             }
             if (/^\s*INSERT/i.test(finalSql) && !/RETURNING/i.test(finalSql)) {
-              finalSql += ' RETURNING id';
+              finalSql += ' RETURNING *';
             }
             const result = await client.query(finalSql, finalParams);
-            return { lastInsertRowid: result.rows?.[0]?.id, changes: result.rowCount };
+            return { lastInsertRowid: result.rows?.[0]?.id ?? result.rows?.[0]?.key ?? null, changes: result.rowCount };
           }
         };
         const result = await fn(txDb);
@@ -463,4 +463,4 @@ async function getNextRefNumber() {
   return `TKT-${String(nextId).padStart(5, '0')}`;
 }
 
-module.exports = { db, getNextRefNumber, initializeDatabase };
+module.exports = { db, getNextRefNumber, initializeDatabase, IS_PG };
